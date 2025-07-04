@@ -1,6 +1,7 @@
 # GCG adapted from https://github.com/llm-attacks/llm-attacks
 
 # %%
+from typing import Union, Tuple, List, Dict, Optional
 from transformers import (
   AutoModelForCausalLM,
   AutoTokenizer,
@@ -17,6 +18,7 @@ from torch.utils.data import Dataset, DataLoader
 
 from tqdm import tqdm
 import json
+import matplotlib.pyplot as plt
 
 # %%
 PROMPT_TEMPLATES = {
@@ -165,9 +167,9 @@ def extract_prompt_from_template(prompt: str, model_name: str) -> str:
 def build_prompt(
   model_name: str,
   prompt: str,
-  tokenizer: PreTrainedTokenizer | PreTrainedTokenizerFast,
+  tokenizer: Union[PreTrainedTokenizer, PreTrainedTokenizerFast],
   validate_prompt: bool = True,
-) -> tuple[Tensor, slice]:
+) -> Tuple[Tensor, slice]:
   """
   Given the actual user prompt, add in the prefix/suffix for the given instruction tuned model
 
@@ -233,10 +235,10 @@ def build_prompt(
 def load_model_tokenizer(
   model_name_or_path: str,
   dtype: torch.dtype = torch.bfloat16,
-  device_map: str | dict = "auto",
+  device_map: Union[str, dict] = "auto",
   use_flash_attn_2: bool = False,
   eval_mode: bool = True,
-) -> tuple[PreTrainedModel, PreTrainedTokenizer | PreTrainedTokenizerFast]:
+) -> Tuple[PreTrainedModel, Union[PreTrainedTokenizer, PreTrainedTokenizerFast]]:
   """
   Load model and tokenizer
 
@@ -311,9 +313,9 @@ class DocDataset(Dataset):
   def __init__(
     self,
     model: PreTrainedModel,
-    tokenizer: PreTrainedTokenizer | PreTrainedTokenizerFast,
-    orig_prompt: str | Tensor,
-    optim_prompt: str | Tensor,
+    tokenizer: Union[PreTrainedTokenizer, PreTrainedTokenizerFast],
+    orig_prompt: Union[str, Tensor],
+    optim_prompt: Union[str, Tensor],
     n_docs: int,
     doc_len: int,
     gen_batch_size: int = 10,
@@ -573,7 +575,7 @@ def replace_tok(
   batch_size: int = 10,
   k: int = 256,
   gamma: float = 0.0,
-) -> tuple[Tensor, float, float]:
+) -> Tuple[Tensor, float, float]:
   """
   Perform exact loss computations and token replacement
 
@@ -699,8 +701,8 @@ def compute_dataset_kl(
   model: PreTrainedModel,
   dataset: DocDataset,
   batch_size: int,
-  embs: Tensor | None = None,
-) -> tuple[float, float]:
+  embs: Optional[Tensor] = None,
+) -> Tuple[float, float]:
   """
   Compute KL b/w orig and optim prompt using the holdout docs
 
@@ -772,7 +774,7 @@ def compute_dataset_kl(
 # %%
 def optim_gcg(
   model: PreTrainedModel,
-  tokenizer: PreTrainedTokenizer | PreTrainedTokenizerFast,
+  tokenizer: Union[PreTrainedTokenizer, PreTrainedTokenizerFast],
   dataset: DocDataset,
   n_epochs: int,
   kl_every: int,
@@ -782,7 +784,7 @@ def optim_gcg(
   gamma: float = 0.0,
   early_stop_kl: float = 0.0,
   suffix_mode: bool = False,
-) -> tuple[list[dict], Tensor]:
+) -> Tuple[List[Dict], Tensor]:
   """
   Optimize a hard prompt via GCG
 
@@ -892,7 +894,7 @@ def optim_soft(
   log_fpath: str,
   emb_save_fpath: str,
   batch_size: int = 10,
-) -> tuple[list[dict], Tensor]:
+) -> Tuple[List[Dict], Tensor]:
   """
   Optimize a soft prompt
 
@@ -1007,3 +1009,61 @@ def optim_soft(
     )
 
   return to_ret, best_embs
+
+
+# %%
+def plot_training_curves(log_fpath: str, save_fpath: str = "training_curves.png"):
+    """
+    Plot training curves from the log file and save the plot
+    
+    Args:
+        log_fpath: Path to the JSON log file
+        save_fpath: Path to save the plot image
+    """
+    # Load the log data
+    with open(log_fpath, 'r') as f:
+        log_data = json.load(f)
+    
+    # Extract data for plotting
+    epochs = [entry['epoch'] for entry in log_data]
+    losses = [entry['loss'] for entry in log_data]
+    best_losses = [entry['best_loss'] for entry in log_data]
+    best_kls = [entry['best_kl'] for entry in log_data]
+    cur_kls = [entry['cur_kl'] for entry in log_data]
+    nll_prompts = [entry['nll_prompt'] for entry in log_data]
+    
+    # Create subplots
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 12))
+    
+    # Plot 1: Loss curves
+    ax1.plot(epochs, losses, 'b-', label='Current Loss', linewidth=2)
+    ax1.plot(epochs, best_losses, 'r--', label='Best Loss', linewidth=2)
+    ax1.set_xlabel('Epoch')
+    ax1.set_ylabel('Loss')
+    ax1.set_title('Training Loss')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    # Plot 2: KL divergence curves
+    ax2.plot(epochs, best_kls, 'g-', label='Best KL', linewidth=2)
+    ax2.plot(epochs, cur_kls, 'orange', label='Current KL', linewidth=2)
+    ax2.set_xlabel('Epoch')
+    ax2.set_ylabel('KL Divergence')
+    ax2.set_title('KL Divergence')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    
+    # Plot 3: NLL Prompt curve
+    ax3.plot(epochs, nll_prompts, 'purple', label='NLL Prompt', linewidth=2)
+    ax3.set_xlabel('Epoch')
+    ax3.set_ylabel('Negative Log Likelihood')
+    ax3.set_title('Prompt Negative Log Likelihood')
+    ax3.legend()
+    ax3.grid(True, alpha=0.3)
+    
+    # Adjust layout and save
+    plt.tight_layout()
+    plt.savefig(save_fpath, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print(f"Training curves saved to: {save_fpath}")
