@@ -1,113 +1,53 @@
 """
-Evil Twins: Prompt Optimization Package
+Evil Twins: Prompt Optimization Framework
 
-This package provides tools for optimizing prompts using both hard (GCG) and soft
-prompt optimization techniques. It implements the methods described in the paper
-"Prompts have evil twins" (EMNLP 2024).
-
-Main components:
-- ModelManager: For loading and managing models and tokenizers
-- DocDataset: For generating and managing document datasets
-- GCGOptimizer: For hard prompt optimization using GCG
-- SoftPromptOptimizer: For soft prompt optimization
-- TrainingVisualizer: For visualizing training results
-
-Example usage:
-    from evil_twins import ModelManager, DocDataset, GCGOptimizer, OptimizationConfig
-    
-    # Load model and tokenizer
-    model_manager = ModelManager("gpt2")
-    model, tokenizer = model_manager.load_model_and_tokenizer()
-    
-    # Create dataset
-    dataset = DocDataset(
-        model=model,
-        tokenizer=tokenizer,
-        orig_prompt="Tell me a recipe.",
-        optim_prompt="! " * 5,
-        n_docs=10,
-        doc_len=16,
-    )
-    
-    # Configure optimization
-    config = OptimizationConfig(
-        batch_size=4,
-        top_k=64,
-        gamma=0.0,
-    )
-    
-    # Run optimization
-    optimizer = GCGOptimizer(
-        model=model,
-        tokenizer=tokenizer,
-        dataset=dataset,
-        config=config,
-        log_fpath="optimization_log.json",
-    )
-    
-    results, best_prompt = optimizer.optimize(n_epochs=10)
+A modular framework for optimizing prompts using various attack methods including
+GCG (Gradient-based optimization) and soft prompts.
 """
 
-# Import main classes and functions
-from .models import ModelManager, load_model_tokenizer
-from .datasets import DocDataset
-from .optimizers import GCGOptimizer, SoftPromptOptimizer, BaseOptimizer
-from .config import OptimizationConfig, ModelConfig
-from .prompts import PromptBuilder, build_prompt, extract_prompt_from_template
-from .visualization import TrainingVisualizer, plot_training_curves, create_comprehensive_visualization
+__version__ = "0.1.0"
 
-# Import legacy functions for backward compatibility
-from .optimizers.gcg import optim_gcg
-from .optimizers.soft import optim_soft
-
-# Import utility functions
-from .utils import (
-    compute_neg_log_prob,
-    compute_grads,
-    replace_tok,
-    compute_dataset_kl,
-    OrigModelEmbs,
+from .config import (
+    GCGConfig,
+    SoftPromptConfig,
+    DatasetConfig,
+    ModelConfig,
+    PROMPT_TEMPLATES,
+    MODEL_NAME_OR_PATH_TO_NAME,
 )
-
-# Import soft prompt embedding layer
-from .optimizers.soft import SoftPromptEmbeddingLayer
-
-__version__ = "0.0.1"
+from .utils import load_model_tokenizer, build_prompt, extract_prompt_from_template
+from .data import DocDataset
+from .attacks import optim_gcg, optim_soft
+from .evaluation import compute_dataset_kl, compute_perplexity
+from .viz import plot_training_curves, plot_prompt_comparison, plot_kl_convergence
 
 __all__ = [
-    # Main classes
-    "ModelManager",
-    "DocDataset",
-    "GCGOptimizer",
-    "SoftPromptOptimizer",
-    "BaseOptimizer",
-    "TrainingVisualizer",
-    
-    # Configuration
-    "OptimizationConfig",
+    # Config classes
+    "GCGConfig",
+    "SoftPromptConfig", 
+    "DatasetConfig",
     "ModelConfig",
+    "PROMPT_TEMPLATES",
+    "MODEL_NAME_OR_PATH_TO_NAME",
     
-    # Prompt management
-    "PromptBuilder",
+    # Utility functions
+    "load_model_tokenizer",
     "build_prompt",
     "extract_prompt_from_template",
     
-    # Model management
-    "load_model_tokenizer",
+    # Data classes
+    "DocDataset",
     
-    # Optimization (legacy)
+    # Attack functions
     "optim_gcg",
     "optim_soft",
     
-    # Utilities
-    "compute_neg_log_prob",
-    "compute_grads",
-    "replace_tok",
+    # Evaluation functions
     "compute_dataset_kl",
-    "OrigModelEmbs",
-    "SoftPromptEmbeddingLayer",
+    "compute_perplexity",
     
-    # Visualization
+    # Visualization functions
     "plot_training_curves",
-    "create_comprehensive_visualization",
-]
+    "plot_prompt_comparison", 
+    "plot_kl_convergence",
+] 
